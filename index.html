@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>スーパー価格メモ</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+    .container { max-width: 680px; margin: 0 auto; padding: 1.5rem 1rem; }
+    h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 1.5rem; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e0e0e0; margin-bottom: 1rem; }
+    .tab { font-size: 13px; padding: 8px 14px; cursor: pointer; color: #666; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: #1a1a1a; font-weight: 500; border-bottom-color: #1a1a1a; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .section-title { font-size: 14px; font-weight: 500; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .badge { font-size: 11px; background: #f0f0ee; color: #666; padding: 2px 8px; border-radius: 99px; font-weight: 400; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; color: #666; }
+    input, select {
+      width: 100%; padding: 8px 10px; font-size: 14px;
+      border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #1a1a1a;
+      outline: none; transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: #999; }
+    .suggest-wrap { position: relative; }
+    .suggest-list {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid #ddd; border-radius: 8px;
+      z-index: 99; max-height: 180px; overflow-y: auto; display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .suggest-item { padding: 8px 12px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+    .suggest-item:hover { background: #f5f5f3; }
+    .suggest-item .s-note { font-size: 11px; color: #999; }
+    .suggest-new { padding: 8px 12px; font-size: 13px; cursor: pointer; color: #185FA5; border-top: 1px solid #eee; }
+    .suggest-new:hover { background: #f5f5f3; }
+    .gram-preview { background: #f5f5f3; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #666; min-height: 34px; }
+.btn-primary { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; cursor: pointer; width: 100%; margin-top: 10px; }
+    .btn-primary:hover:not(:disabled) { background: #333; }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-sm { font-size: 12px; padding: 4px 10px; border-radius: 8px; border: 1px solid #ddd; background: none; cursor: pointer; color: #666; }
+    .btn-sm:hover { background: #f5f5f3; }
+    .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .filter-row input { flex: 1; }
+    .item-list { display: flex; flex-direction: column; gap: 8px; }
+    .item-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; }
+.item-info { flex: 1; min-width: 0; }
+    .item-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta { font-size: 12px; color: #999; margin-top: 2px; }
+    .item-price-col { text-align: right; flex-shrink: 0; }
+    .item-price { font-size: 16px; font-weight: 500; }
+    .item-gram-price { font-size: 11px; color: #999; margin-top: 2px; }
+    .cheapest-tag { font-size: 10px; color: #0F6E56; display: block; }
+    .del-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 16px; padding: 4px; border-radius: 4px; }
+    .del-btn:hover { color: #666; background: #f5f5f3; }
+    .master-list { display: flex; flex-direction: column; gap: 6px; }
+    .master-item { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 8px 12px; }
+    .master-item-info { flex: 1; }
+    .master-name { font-size: 14px; font-weight: 500; }
+    .master-sub { font-size: 11px; color: #999; }
+    .compare-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+    .compare-table th { text-align: left; font-weight: 500; color: #999; padding: 6px; border-bottom: 1px solid #eee; font-size: 11px; }
+    .compare-table td { padding: 8px 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .cheap-tag { background: #E1F5EE; color: #0F6E56; font-size: 10px; padding: 2px 5px; border-radius: 99px; }
+    .cheap-tag-gram { background: #E6F1FB; color: #185FA5; font-size: 10px; padding: 2px 5px; border-radius: 99px; }
+    .empty { text-align: center; padding: 2rem; color: #999; font-size: 13px; line-height: 1.8; }
+    .err { color: #A32D2D; font-size: 12px; margin-top: 8px; display: none; }
+    .success { color: #0F6E56; font-size: 12px; margin-top: 8px; display: none; }
+    .hint { font-size: 11px; color: #999; margin-top: 3px; }
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.75);
+      display: none; align-items: center; justify-content: center; z-index: 999;
+    }
+    .spinner {
+      width: 28px; height: 28px; border: 3px solid #e0e0e0;
+      border-top-color: #1a1a1a; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .filter-grid input { grid-column: 1 / -1; }
+    .edit-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 16px; padding: 4px; border-radius: 4px; }
+    .edit-btn:hover { color: #185FA5; background: #f0f5ff; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 1.25rem; width: 100%; max-width: 480px; }
+    .modal-title { font-size: 14px; font-weight: 500; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .modal-actions .btn-primary { margin-top: 0; }
+    .btn-cancel { font-size: 14px; padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; background: none; cursor: pointer; color: #666; white-space: nowrap; }
+    .btn-cancel:hover { background: #f5f5f3; }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-overlay" id="edit-modal" onclick="closeEditModal(event)">
+  <div class="modal-box">
+    <div class="modal-title"><i class="ti ti-pencil"></i> 記録を編集</div>
+    <input type="hidden" id="edit-id" />
+    <div class="form-grid">
+      <div class="form-group">
+        <label>スーパー名</label>
+        <input type="text" id="edit-store" list="store-list" />
+      </div>
+      <div class="form-group">
+        <label>価格（円）</label>
+        <input type="number" id="edit-price" min="0" oninput="calcEditGramPrice()" />
+      </div>
+      <div class="form-group">
+        <label>内容量（g・ml）</label>
+        <input type="number" id="edit-gram" min="0" oninput="calcEditGramPrice()" />
+      </div>
+      <div class="form-group">
+        <label>メモ</label>
+        <input type="text" id="edit-note" />
+      </div>
+      <div class="form-group full">
+        <div class="gram-preview" id="edit-gram-preview"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveEdit()"><i class="ti ti-check"></i> 保存する</button>
+      <button class="btn-cancel" onclick="closeEditModal()">キャンセル</button>
+    </div>
+    <p class="err" id="edit-err"></p>
+  </div>
+</div>
+
+<div class="container">
+  <h1><i class="ti ti-shopping-cart"></i> スーパー価格メモ</h1>
+  <p class="subtitle">商品を登録して価格を記録、どこが一番安いか比較できます</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('record')"><i class="ti ti-pencil"></i> 価格を記録</button>
+    <button class="tab" onclick="switchTab('compare')"><i class="ti ti-chart-bar"></i> 比較</button>
+    <button class="tab" onclick="switchTab('list')"><i class="ti ti-list"></i> 一覧</button>
+    <button class="tab" onclick="switchTab('master')"><i class="ti ti-tag"></i> 商品管理</button>
+  </div>
+
+  <!-- 価格記録タブ -->
+  <div class="tab-content active" id="tab-record">
+    <div class="card">
+      <div class="section-title"><i class="ti ti-plus"></i> 価格を追加</div>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>商品名</label>
+          <div class="suggest-wrap">
+            <input type="text" id="inp-name" placeholder="商品名を入力または選択…" autocomplete="off"
+              oninput="onNameInput()" onfocus="onNameInput()" onblur="hideSuggest()" />
+            <div class="suggest-list" id="suggest-list"></div>
+          </div>
+          <div class="hint">過去の商品が候補に出ます。新しい商品は入力後に登録できます</div>
+        </div>
+        <div class="form-group">
+          <label>スーパー名</label>
+          <input type="text" id="inp-store" placeholder="例：イオン西台" list="store-list" />
+          <datalist id="store-list"></datalist>
+        </div>
+        <div class="form-group">
+          <label>価格（円）</label>
+          <input type="number" id="inp-price" placeholder="198" min="0" oninput="calcGramPrice()" />
+        </div>
+        <div class="form-group">
+          <label>内容量（g・ml）※任意</label>
+          <input type="number" id="inp-gram" placeholder="例：500" min="0" oninput="calcGramPrice()" />
+        </div>
+        <div class="form-group">
+          <label>メモ</label>
+          <input type="text" id="inp-note" placeholder="例：特売、いつもの正" />
+        </div>
+        <div class="form-group full">
+          <div class="gram-preview" id="gram-preview">内容量を入力すると100gあたりの価格を自動計算します</div>
+        </div>
+      </div>
+      <button class="btn-primary" id="btn-add" onclick="addItem()"><i class="ti ti-check"></i> 追加する</button>
+      <p class="err" id="err-msg"></p>
+      <p class="success" id="ok-msg">✓ 追加しました！</p>
+    </div>
+  </div>
+
+  <!-- 一覧・比較タブ -->
+  <div class="tab-content" id="tab-list">
+    <div class="card">
+      <div class="section-title">
+        <i class="ti ti-list"></i> 記録一覧
+        <span class="badge" id="count-badge">0件</span>
+      </div>
+      <div class="filter-grid">
+        <input type="text" id="filter-name" placeholder="商品名で絞り込み" oninput="renderList()" />
+        <select id="filter-cat" onchange="renderList()">
+          <option value="">全カテゴリ</option>
+        </select>
+        <select id="filter-store" onchange="renderList()">
+          <option value="">全スーパー</option>
+        </select>
+      </div>
+      <div class="item-list" id="item-list">
+        <div class="empty">まだ記録がありません。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 比較タブ -->
+  <div class="tab-content" id="tab-compare">
+    <div class="card">
+      <div class="section-title"><i class="ti ti-chart-bar"></i> 商品別・価格比較</div>
+      <div id="compare-empty" class="empty" style="display:none">同じ商品が複数のスーパーで記録されると比較が表示されます。</div>
+      <table class="compare-table" id="compare-table">
+        <thead>
+          <tr>
+            <th style="width:22%">商品名</th>
+            <th style="width:20%">スーパー</th>
+            <th style="width:16%">価格</th>
+            <th style="width:22%">100gあたり</th>
+            <th style="width:20%">差額</th>
+          </tr>
+        </thead>
+        <tbody id="compare-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 商品管理タブ -->
+  <div class="tab-content" id="tab-master">
+    <div class="card">
+      <div class="section-title"><i class="ti ti-plus"></i> 新しい商品を登録</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>商品名</label>
+          <input type="text" id="m-name" placeholder="例：牛乳" />
+        </div>
+        <div class="form-group">
+          <label>カテゴリ</label>
+          <input type="text" id="m-cat" placeholder="例：乳製品、肉、野菜" list="cat-list" />
+          <datalist id="cat-list"></datalist>
+        </div>
+        <div class="form-group full">
+          <label>メモ（ブランド・規格など）</label>
+          <input type="text" id="m-note" placeholder="例：明治、1L入り" />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="addMaster()"><i class="ti ti-check"></i> 商品を登録</button>
+      <p class="err" id="m-err"></p>
+    </div>
+    <div class="card">
+      <div class="section-title">
+        <i class="ti ti-tag"></i> 登録済み商品
+        <span class="badge" id="master-count">0件</span>
+      </div>
+      <div class="master-list" id="master-list">
+        <div class="empty">まだ商品が登録されていません。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/*
+  ============================================================
+  【Supabase セットアップ手順】
+
+  1. SQL Editor で以下を実行してテーブルを作成
+
+  CREATE TABLE masters (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    cat TEXT DEFAULT '',
+    note TEXT DEFAULT '',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  );
+
+  CREATE TABLE items (
+    id BIGSERIAL PRIMARY KEY,
+    master_id BIGINT REFERENCES masters(id),
+    name TEXT NOT NULL,
+    store TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    gram NUMERIC,
+    gram_price NUMERIC,
+    note TEXT DEFAULT '',
+    img_url TEXT,
+    date TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  );
+
+  2. Storage > New bucket で「item-images」を作成（Public をオン）
+
+  3. RLS を無効化、または anon ロールに以下のポリシーを付与
+     masters / items：SELECT, INSERT, DELETE
+     item-images バケット：SELECT, INSERT
+
+  4. 下の SUPABASE_URL と SUPABASE_ANON_KEY を入力して保存
+  ============================================================
+*/
+
+// ▼ ここにSupabaseの接続情報を入力してください
+const SUPABASE_URL = 'https://dhnmfzwjdjkhtpxttdst.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_86G-lJn8O0EGukMppCfZ0g_pzG1bRpW';
+// ▲
+
+const { createClient } = window.supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let items = [];
+let masters = [];
+let selectedMasterId = null;
+
+// ---------- ユーティリティ ----------
+
+function setLoading(v) {
+  document.getElementById('loading-overlay').style.display = v ? 'flex' : 'none';
+  document.getElementById('btn-add').disabled = v;
+}
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function hideErr(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function itemFromDB(row) {
+  return {
+    id: row.id,
+    masterId: row.master_id,
+    name: row.name,
+    store: row.store,
+    price: row.price,
+    gram: row.gram,
+    gramPrice: row.gram_price,
+    note: row.note || '',
+    img: row.img_url,
+    date: row.date
+  };
+}
+
+// ---------- 初期データ読み込み ----------
+
+async function loadData() {
+  setLoading(true);
+  const [mastersRes, itemsRes] = await Promise.all([
+    db.from('masters').select('*').order('name'),
+    db.from('items').select('*').order('id', { ascending: false })
+  ]);
+  if (mastersRes.error) console.error('masters:', mastersRes.error.message);
+  if (itemsRes.error) console.error('items:', itemsRes.error.message);
+  masters = (mastersRes.data || []).map(m => ({
+    id: m.id, name: m.name, cat: m.cat || '', note: m.note || ''
+  }));
+  items = (itemsRes.data || []).map(itemFromDB);
+  setLoading(false);
+  renderList(); renderMaster();
+}
+
+// ---------- タブ切り替え ----------
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const tabs = ['record', 'compare', 'list', 'master'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'list') renderList();
+  if (name === 'compare') renderCompare();
+  if (name === 'master') renderMaster();
+}
+
+// ---------- 商品名サジェスト ----------
+
+function onNameInput() {
+  const val = document.getElementById('inp-name').value.trim().toLowerCase();
+  const sl = document.getElementById('suggest-list');
+  const matched = masters.filter(m => !val || m.name.toLowerCase().includes(val));
+  if (!matched.length && !val) { sl.style.display = 'none'; return; }
+  let html = matched.map(m => `
+    <div class="suggest-item" onmousedown="selectMaster(${m.id})">
+      <span>${m.name}${m.cat ? ' <span class="s-note">' + m.cat + '</span>' : ''}</span>
+      ${m.note ? '<span class="s-note">' + m.note + '</span>' : ''}
+    </div>`).join('');
+  const exactExists = masters.some(m => m.name.toLowerCase() === val);
+  if (val && !exactExists) {
+    html += `<div class="suggest-new" onmousedown="quickAddMaster('${val}')"><i class="ti ti-plus"></i> 「${val}」を新しく登録して選択</div>`;
+  }
+  sl.innerHTML = html;
+  sl.style.display = html ? 'block' : 'none';
+}
+
+function hideSuggest() {
+  setTimeout(() => { document.getElementById('suggest-list').style.display = 'none'; }, 150);
+}
+
+function selectMaster(id) {
+  const m = masters.find(x => x.id === id);
+  if (!m) return;
+  selectedMasterId = id;
+  document.getElementById('inp-name').value = m.name;
+  document.getElementById('suggest-list').style.display = 'none';
+}
+
+async function quickAddMaster(name) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const { data, error } = await db.from('masters')
+    .insert({ name: trimmed, cat: '', note: '' })
+    .select().single();
+  if (error) { console.error(error.message); return; }
+  masters.push({ id: data.id, name: data.name, cat: '', note: '' });
+  selectedMasterId = data.id;
+  document.getElementById('inp-name').value = data.name;
+  document.getElementById('suggest-list').style.display = 'none';
+}
+
+// ---------- 100gあたり計算 ----------
+
+function calcGramPrice() {
+  const price = parseFloat(document.getElementById('inp-price').value);
+  const gram = parseFloat(document.getElementById('inp-gram').value);
+  const el = document.getElementById('gram-preview');
+  if (!isNaN(price) && !isNaN(gram) && gram > 0) {
+    const per100 = (price / gram * 100).toFixed(1);
+    el.innerHTML = `<strong>100gあたり ¥${per100}</strong>（¥${price} ÷ ${gram}g）`;
+  } else {
+    el.textContent = '内容量を入力すると100gあたりの価格を自動計算します';
+  }
+}
+
+
+// ---------- 価格記録 ----------
+
+async function addItem() {
+  const name = document.getElementById('inp-name').value.trim();
+  const store = document.getElementById('inp-store').value.trim();
+  const price = parseInt(document.getElementById('inp-price').value);
+  const gram = parseFloat(document.getElementById('inp-gram').value);
+  const note = document.getElementById('inp-note').value.trim();
+  hideErr('err-msg');
+
+  if (!name || !store || isNaN(price) || price < 0) {
+    showErr('err-msg', '商品名・スーパー名・価格は必須です'); return;
+  }
+
+  setLoading(true);
+
+  // マスター取得または自動作成
+  let masterId = selectedMasterId;
+  if (!masterId || !masters.find(m => m.id === masterId && m.name === name)) {
+    const existing = masters.find(m => m.name === name);
+    if (existing) {
+      masterId = existing.id;
+    } else {
+      const { data: mData, error: mErr } = await db.from('masters')
+        .insert({ name, cat: '', note: '' })
+        .select().single();
+      if (mErr) { setLoading(false); showErr('err-msg', 'エラーが発生しました'); return; }
+      masters.push({ id: mData.id, name, cat: '', note: '' });
+      masterId = mData.id;
+    }
+  }
+
+  const gramPrice = (!isNaN(gram) && gram > 0) ? Math.round(price / gram * 1000) / 10 : null;
+  const { data: iData, error: iErr } = await db.from('items')
+    .insert({
+      master_id: masterId,
+      name,
+      store,
+      price,
+      gram: (!isNaN(gram) && gram > 0) ? gram : null,
+      gram_price: gramPrice,
+      note,
+      date: new Date().toLocaleDateString('ja-JP')
+    })
+    .select().single();
+
+  setLoading(false);
+  if (iErr) { showErr('err-msg', 'エラーが発生しました'); return; }
+
+  items.unshift(itemFromDB(iData));
+
+  // フォームリセット
+  ['inp-name', 'inp-store', 'inp-price', 'inp-gram', 'inp-note'].forEach(fid => {
+    document.getElementById(fid).value = '';
+  });
+  document.getElementById('gram-preview').textContent = '内容量を入力すると100gあたりの価格を自動計算します';
+  selectedMasterId = null;
+
+  const ok = document.getElementById('ok-msg');
+  ok.style.display = 'block';
+  setTimeout(() => { ok.style.display = 'none'; }, 2000);
+  renderList();
+}
+
+async function deleteItem(id) {
+  setLoading(true);
+  const { error } = await db.from('items').delete().eq('id', id);
+  setLoading(false);
+  if (error) { alert('削除に失敗しました'); return; }
+  items = items.filter(i => i.id !== id);
+  renderList();
+}
+
+// ---------- 一覧・比較 ----------
+
+function getItemCat(item) {
+  return masters.find(m => m.id === item.masterId)?.cat || '';
+}
+
+function renderList() {
+  const fn = document.getElementById('filter-name').value.toLowerCase();
+  const fs = document.getElementById('filter-store').value;
+  const fc = document.getElementById('filter-cat').value;
+
+  const stores = [...new Set(items.map(i => i.store))];
+  const storeSelect = document.getElementById('filter-store');
+  const cur = storeSelect.value;
+  storeSelect.innerHTML = '<option value="">全スーパー</option>' +
+    stores.map(s => `<option value="${s}"${s === cur ? ' selected' : ''}>${s}</option>`).join('');
+  document.getElementById('store-list').innerHTML = stores.map(s => `<option value="${s}">`).join('');
+
+  const cats = [...new Set(masters.map(m => m.cat).filter(Boolean))];
+  const catSelect = document.getElementById('filter-cat');
+  const curCat = catSelect.value;
+  catSelect.innerHTML = '<option value="">全カテゴリ</option>' +
+    cats.map(c => `<option value="${c}"${c === curCat ? ' selected' : ''}>${c}</option>`).join('');
+
+  let filtered = items.filter(i =>
+    (!fn || i.name.toLowerCase().includes(fn)) &&
+    (!fs || i.store === fs) &&
+    (!fc || getItemCat(i) === fc)
+  );
+  document.getElementById('count-badge').textContent = filtered.length + '件';
+
+  const minPrice = {}, minGram = {};
+  items.forEach(i => {
+    const key = i.masterId || i.name;
+    if (!minPrice[key] || i.price < minPrice[key]) minPrice[key] = i.price;
+    if (i.gramPrice !== null && (!minGram[key] || i.gramPrice < minGram[key])) minGram[key] = i.gramPrice;
+  });
+
+  const list = document.getElementById('item-list');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty">${items.length ? '絞り込み結果が0件です' : 'まだ記録がありません。<br>「価格を記録」タブから追加してみましょう。'}</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(item => {
+    const key = item.masterId || item.name;
+    const sameKey = items.filter(i => (i.masterId || i.name) === key);
+    const isCheapP = sameKey.length > 1 && item.price === minPrice[key];
+    const isCheapG = item.gramPrice !== null &&
+      sameKey.filter(i => i.gramPrice !== null).length > 1 &&
+      item.gramPrice === minGram[key];
+    return `<div class="item-card">
+      <div class="item-info">
+        <div class="item-name">${item.name}</div>
+        <div class="item-meta">${item.store}${item.gram ? ' · ' + item.gram + 'g' : ''}${item.note ? ' · ' + item.note : ''} · ${item.date}</div>
+      </div>
+      <div class="item-price-col">
+        <div class="item-price">¥${item.price.toLocaleString()}${isCheapP ? '<span class="cheapest-tag">最安値★</span>' : ''}</div>
+        <div class="item-gram-price">${item.gramPrice !== null
+          ? `100gあたり ¥${item.gramPrice.toFixed(1)}${isCheapG ? ' <span style="color:#185FA5">単価最安★</span>' : ''}`
+          : '内容量未入力'}</div>
+      </div>
+      <button class="edit-btn" onclick="openEditModal(${item.id})" title="編集"><i class="ti ti-pencil"></i></button>
+      <button class="del-btn" onclick="deleteItem(${item.id})" title="削除"><i class="ti ti-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+
+function renderCompare() {
+  const byMaster = {};
+  items.forEach(i => {
+    const key = i.masterId || i.name;
+    if (!byMaster[key]) byMaster[key] = { name: i.name, items: [] };
+    byMaster[key].items.push(i);
+  });
+  const multi = Object.values(byMaster).filter(g => g.items.length > 1);
+  const emptyEl = document.getElementById('compare-empty');
+  const tableEl = document.getElementById('compare-table');
+  if (!multi.length) {
+    emptyEl.style.display = 'block';
+    tableEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  tableEl.style.display = 'table';
+  document.getElementById('compare-body').innerHTML = multi.flatMap(group => {
+    const sorted = [...group.items].sort((a, b) => a.price - b.price);
+    const minP = sorted[0].price;
+    const gramItems = sorted.filter(i => i.gramPrice !== null);
+    const minG = gramItems.length ? Math.min(...gramItems.map(i => i.gramPrice)) : null;
+    return sorted.map((item, idx) => {
+      const isCheapP = item.price === minP;
+      const isCheapG = item.gramPrice !== null && item.gramPrice === minG && gramItems.length > 1;
+      const diff = item.price - minP;
+      return `<tr>
+        <td>${idx === 0 ? `<strong>${group.name}</strong>` : ''}</td>
+        <td>${item.store}</td>
+        <td>¥${item.price.toLocaleString()}</td>
+        <td>${item.gramPrice !== null
+          ? `¥${item.gramPrice.toFixed(1)}${isCheapG ? ' <span class="cheap-tag-gram">単価最安</span>' : ''}`
+          : '<span style="color:#999">—</span>'}</td>
+        <td style="color:${isCheapP ? '#0F6E56' : '#999'}">${isCheapP
+          ? '<span class="cheap-tag">最安値</span>'
+          : `+¥${diff.toLocaleString()}`}</td>
+      </tr>`;
+    });
+  }).join('');
+}
+
+// ---------- 編集モーダル ----------
+
+function openEditModal(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-store').value = item.store;
+  document.getElementById('edit-price').value = item.price;
+  document.getElementById('edit-gram').value = item.gram || '';
+  document.getElementById('edit-note').value = item.note || '';
+  hideErr('edit-err');
+  calcEditGramPrice();
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal(e) {
+  if (e && e.target !== document.getElementById('edit-modal')) return;
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+function calcEditGramPrice() {
+  const price = parseFloat(document.getElementById('edit-price').value);
+  const gram = parseFloat(document.getElementById('edit-gram').value);
+  const el = document.getElementById('edit-gram-preview');
+  if (!isNaN(price) && !isNaN(gram) && gram > 0) {
+    el.innerHTML = `<strong>100gあたり ¥${(price / gram * 100).toFixed(1)}</strong>（¥${price} ÷ ${gram}g）`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+async function saveEdit() {
+  const id = parseInt(document.getElementById('edit-id').value);
+  const store = document.getElementById('edit-store').value.trim();
+  const price = parseInt(document.getElementById('edit-price').value);
+  const gram = parseFloat(document.getElementById('edit-gram').value);
+  const note = document.getElementById('edit-note').value.trim();
+  hideErr('edit-err');
+
+  if (!store || isNaN(price) || price < 0) {
+    showErr('edit-err', 'スーパー名と価格は必須です'); return;
+  }
+
+  const gramPrice = (!isNaN(gram) && gram > 0) ? Math.round(price / gram * 1000) / 10 : null;
+
+  setLoading(true);
+  const { error } = await db.from('items').update({
+    store,
+    price,
+    gram: (!isNaN(gram) && gram > 0) ? gram : null,
+    gram_price: gramPrice,
+    note
+  }).eq('id', id);
+  setLoading(false);
+
+  if (error) { showErr('edit-err', 'エラーが発生しました'); return; }
+
+  const item = items.find(i => i.id === id);
+  if (item) {
+    item.store = store; item.price = price;
+    item.gram = (!isNaN(gram) && gram > 0) ? gram : null;
+    item.gramPrice = gramPrice; item.note = note;
+  }
+
+  document.getElementById('edit-modal').classList.remove('open');
+  renderList();
+}
+
+// ---------- 商品管理 ----------
+
+async function addMaster() {
+  const name = document.getElementById('m-name').value.trim();
+  const cat = document.getElementById('m-cat').value.trim();
+  const note = document.getElementById('m-note').value.trim();
+  hideErr('m-err');
+  if (!name) { showErr('m-err', '商品名は必須です'); return; }
+  if (masters.find(m => m.name === name)) { showErr('m-err', '同じ商品名がすでに登録されています'); return; }
+
+  setLoading(true);
+  const { data, error } = await db.from('masters')
+    .insert({ name, cat, note })
+    .select().single();
+  setLoading(false);
+  if (error) { showErr('m-err', 'エラーが発生しました'); return; }
+
+  masters.push({ id: data.id, name, cat, note });
+  renderMaster();
+  ['m-name', 'm-cat', 'm-note'].forEach(fid => { document.getElementById(fid).value = ''; });
+}
+
+async function deleteMaster(id) {
+  if (items.some(i => i.masterId === id)) {
+    alert('この商品の価格記録があるため削除できません。先に記録を削除してください。'); return;
+  }
+  setLoading(true);
+  const { error } = await db.from('masters').delete().eq('id', id);
+  setLoading(false);
+  if (error) { alert('削除に失敗しました'); return; }
+  masters = masters.filter(m => m.id !== id);
+  renderMaster();
+}
+
+function renderMaster() {
+  const cats = [...new Set(masters.map(m => m.cat).filter(Boolean))];
+  document.getElementById('cat-list').innerHTML = cats.map(c => `<option value="${c}">`).join('');
+  document.getElementById('master-count').textContent = masters.length + '件';
+  const list = document.getElementById('master-list');
+  if (!masters.length) { list.innerHTML = '<div class="empty">まだ商品が登録されていません。</div>'; return; }
+  list.innerHTML = masters.map(m => {
+    const cnt = items.filter(i => i.masterId === m.id).length;
+    return `<div class="master-item">
+      <div class="master-item-info">
+        <div class="master-name">${m.name}</div>
+        <div class="master-sub">${m.cat ? m.cat + ' · ' : ''}${m.note ? m.note + ' · ' : ''}価格記録 ${cnt}件</div>
+      </div>
+      <button class="btn-sm" onclick="deleteMaster(${m.id})"><i class="ti ti-trash"></i> 削除</button>
+    </div>`;
+  }).join('');
+}
+
+// ---------- 起動 ----------
+loadData();
+</script>
+</body>
+</html>
